@@ -1,7 +1,28 @@
 #include "his.h"
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+int his_console_init(void) {
+#ifdef _WIN32
+    // Windows 控制台默认常为 CP936(GBK)，源码若为 UTF-8 会导致中文乱码。
+    // 切到 UTF-8 以便正确显示 UTF-8 字节序列。
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+#endif
+
+    // 尽可能启用 UTF-8 locale；失败则回退到系统默认 locale。
+    if (!setlocale(LC_ALL, ".UTF8")) {
+        setlocale(LC_ALL, "");
+    }
+
+    return 1;
+}
 
 // ================== 加载函数 ==================
 
@@ -411,6 +432,7 @@ int save_inpatients(const char *filename) {
 
 int his_init(const char *data_dir) {
     if (!data_dir) return 0;
+    (void)his_console_init();
     char path[256];
     int ok = 1;
     sprintf(path, "%s/patients.txt", data_dir);    ok = ok && load_patients(path);

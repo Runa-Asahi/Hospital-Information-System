@@ -114,6 +114,9 @@ extern Consultation *g_consultation_head;
 extern Examination *g_examination_head;
 extern Inpatient *g_inpatient_head;
 
+/* ==================== 控制台编码 ==================== */
+int his_console_init(void);
+
 /* ==================== 文件读写/初始化 ==================== */
 int load_patients(const char *filename);
 int load_doctors(const char *filename);

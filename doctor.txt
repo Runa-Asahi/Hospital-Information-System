@@ -1,3 +1,0 @@
-id,name,age,gender,department,title,schedule
-1,王医生,45,1,内科,主任医师,周一、周三
-2,李医生,38,0,外科,副主任医师,周二、周四
