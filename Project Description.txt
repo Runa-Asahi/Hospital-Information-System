@@ -1,0 +1,7 @@
+项目说明（关于函数返回值）
+1.*_insert / *_delete / *_update / *_update_stock / *_update_discharge / ward_occupy_bed /
+ ward_release_bed：成功返回 1，失败返回 0
+
+2.*_print_all / *_free_all：返回实际打印/释放的节点数量（>= 0）
+
+3.*_print_by_patient：找到记录返回 1，否则返回 0（并保留原有打印行为）
