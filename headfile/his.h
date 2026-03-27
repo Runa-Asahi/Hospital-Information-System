@@ -93,16 +93,37 @@ typedef struct Examination {
 
 // 住院记录
 typedef struct Inpatient {
-    int id;
-    char patient_name[50];
-    int ward_id;
-    int bed_num;
+    int id;// 住院ID
+    char patient_name[50];// 患者姓名
+    int ward_id;// 病房ID
+    int bed_num;// 床位号
     float deposit;// 押金
     char admit_date[20];// 入院日期
     char discharge_date[20];    // 未出院可为空
     struct Inpatient *prev;
     struct Inpatient *next;
 } Inpatient;
+
+// 计费流水
+typedef enum BillingType {
+    BILL_DEPOSIT = 0,   // 入院押金
+    BILL_TOPUP   = 1,   // 补缴押金
+    BILL_CHARGE  = 2,   // 费用扣除
+    BILL_REFUND  = 3    // 退费
+} BillingType;
+
+typedef struct Billing {
+    int id;                 // 流水ID
+    int inpatient_id;       // 关联住院ID
+    char patient_name[50];  // 患者姓名（便于打印）
+    int ward_id;            // 病房ID（便于追溯）
+    BillingType type;       // 流水类型
+    float amount;           // 金额（正数）
+    char datetime[24];      // 时间字符串：YYYY-MM-DD / YYYY-MM-DDTHH:MM
+    char note[100];         // 备注（可为空）
+    struct Billing *prev;
+    struct Billing *next;
+} Billing;
 
 extern Patient *g_patient_head;
 extern Doctor  *g_doctor_head;
@@ -113,6 +134,7 @@ extern Register *g_register_head;
 extern Consultation *g_consultation_head;
 extern Examination *g_examination_head;
 extern Inpatient *g_inpatient_head;
+extern Billing *g_billing_head;
 
 /* ==================== 控制台编码 ==================== */
 int his_console_init(void);
@@ -127,6 +149,7 @@ int load_registers(const char *filename);
 int load_consultations(const char *filename);
 int load_examinations(const char *filename);
 int load_inpatients(const char *filename);
+int load_billings(const char *filename);
 
 int save_patients(const char *filename);
 int save_doctors(const char *filename);
@@ -137,6 +160,7 @@ int save_registers(const char *filename);
 int save_consultations(const char *filename);
 int save_examinations(const char *filename);
 int save_inpatients(const char *filename);
+int save_billings(const char *filename);
 
 int his_init(const char *data_dir);
 int his_save(const char *data_dir);
@@ -189,7 +213,9 @@ Ward* ward_create(int id, const char *type, int total_beds, const char *departme
 int ward_insert(Ward **head, Ward *node);
 int ward_delete(Ward **head, int id);
 Ward* ward_find_by_id(Ward *head, int id);
-Ward* ward_find_by_type(Ward *head, const char *type); // 返回第一个匹配
+int ward_free_beds(const Ward *w);
+Ward* ward_find_available_by_type(Ward *head, const char *type, int required_free_beds);
+Ward* ward_find_by_type(Ward *head, const char *type); // 同类型中择优（至少1张空床）
 int ward_has_free_bed(Ward *w);
 int ward_occupy_bed(Ward *w);
 int ward_release_bed(Ward *w);
@@ -228,10 +254,40 @@ Inpatient* inpatient_create(int id, const char *patient, int ward_id, int bed_nu
                             float deposit, const char *admit_date, const char *discharge_date);
 int inpatient_insert(Inpatient **head, Inpatient *node);
 int inpatient_delete(Inpatient **head, int id);
+int inpatient_next_id(Inpatient *head);
 Inpatient* inpatient_find_by_id(Inpatient *head, int id);
 Inpatient* inpatient_find_by_patient(Inpatient *head, const char *patient); // 返回第一个
 int inpatient_update_discharge(Inpatient *ip, const char *discharge_date);
 int inpatient_print_all(Inpatient *head);
 int inpatient_free_all(Inpatient **head);
+
+int inpatient_admit_auto(Inpatient **ihead, Billing **bhead, Ward *ward_head,
+                         int inpatient_id, const char *patient_name, const char *ward_type,
+                         float deposit, int planned_days, const char *admit_datetime);
+
+/* ==================== 计费模块 ==================== */
+Billing* billing_create(int id, int inpatient_id, const char *patient_name,
+                        int ward_id, BillingType type, float amount,
+                        const char *datetime, const char *note);
+int billing_insert(Billing **head, Billing *node);
+Billing* billing_find_by_id(Billing *head, int id);
+int billing_print_all(Billing *head);
+int billing_print_by_inpatient(Billing *head, int inpatient_id);
+int billing_free_all(Billing **head);
+
+int billing_validate_initial_deposit(float deposit, int planned_days);
+float billing_daily_rate_by_ward(const Ward *w);
+
+int billing_add_deposit(Billing **bhead, Inpatient *ip, int bill_id,
+                        float amount, const char *datetime, const char *note);
+int billing_topup(Billing **bhead, Inpatient *ip, int bill_id,
+                  float amount, const char *datetime, const char *note);
+
+int billing_auto_charge_until(Billing **bhead, Inpatient *ip, const Ward *w,
+                              const char *now_datetime, int *charged_days, float *total_charged);
+int billing_settle_on_discharge(Billing **bhead, Inpatient *ip, const Ward *w,
+                                const char *discharge_datetime, float *total_cost, float *refund, float *due);
+int billing_print_settlement(Billing *bhead, const Inpatient *ip, const Ward *w,
+                             const char *as_of_datetime);
 
 #endif // HIS_H

@@ -10,5 +10,6 @@
 - consultations.txt
 - examinations.txt
 - inpatients.txt
+- billings.txt
 
 每个文件第一行为标题行，后续为数据行，字段以空格分隔。

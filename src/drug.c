@@ -51,11 +51,19 @@ Drug* drug_find_by_id(Drug *head, int id) {
 
 Drug* drug_find_by_name(Drug *head, const char *name) {
     Drug *cur = head;
+    Drug *result = NULL;
     while (cur) {
-        if (strcmp(cur->name, name) == 0) return cur;
+        if (strcmp(cur->name, name) == 0) {
+            if (!result) {
+                result = cur;
+            } else {
+                printf("警告：找到多个同名药品（ID: %d, ID: %d），请使用药品ID进行唯一查找。\n", result->id, cur->id);
+                return NULL;
+            }
+        }
         cur = cur->next;
     }
-    return NULL;
+    return result;
 }
 
 int drug_update_stock(Drug *d, int delta) {// delta可正可负

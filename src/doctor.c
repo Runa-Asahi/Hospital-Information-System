@@ -54,11 +54,19 @@ Doctor* doctor_find_by_id(Doctor *head, int id) {
 
 Doctor* doctor_find_by_name(Doctor *head, const char *name) {
     Doctor *cur = head;
+    Doctor *result = NULL;
     while (cur) {
-        if (strcmp(cur->name, name) == 0) return cur;
+        if (strcmp(cur->name, name) == 0) {
+            if (!result) {
+                result = cur;
+            } else {
+                printf("警告：找到多个同名医生（ID: %d, ID: %d），请使用工号ID进行唯一查找。\n", result->id, cur->id);
+                return NULL;
+            }
+        }
         cur = cur->next;
     }
-    return NULL;
+    return result;
 }
 
 int doctor_update(Doctor *d, const char *name, int age, bool gender,

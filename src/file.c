@@ -277,8 +277,10 @@ int load_inpatients(const char *filename) {
         int id, ward_id, bed_num;
         float deposit;
         char patient[50], admit_date[20], discharge_date[20];
-        if (sscanf(line, "%d %49s %d %d %f %19s %19s",
-                   &id, patient, &ward_id, &bed_num, &deposit, admit_date, discharge_date) == 7) {
+        int n = sscanf(line, "%d %49s %d %d %f %19s %19s",
+                       &id, patient, &ward_id, &bed_num, &deposit, admit_date, discharge_date);
+        if (n == 6 || n == 7) {
+            if (n == 6) discharge_date[0] = '\0';
             Inpatient *ip = inpatient_create(id, patient, ward_id, bed_num, deposit, admit_date, discharge_date);
             if (ip) {
                 inpatient_insert(&g_inpatient_head, ip);
@@ -289,6 +291,53 @@ int load_inpatients(const char *filename) {
             fprintf(stderr, "警告：第%d行住院记录格式无效: %s", line_num, line);
         }
     }
+    fclose(fp);
+    return 1;
+}
+
+// 加载计费流水
+int load_billings(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+
+    char line[512];
+    int line_num = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        line_num++;
+        if (line[0] == '\n' || line[0] == '\r') continue;
+        if (line_num == 1) continue;
+
+        int id, inpatient_id, ward_id;
+        char patient[50];
+        char type_str[20];
+        float amount;
+        char dt[24];
+        char note[100] = {0};
+
+        int n = sscanf(line, "%d %d %49s %d %19s %f %23s %99[^\n]",
+                       &id, &inpatient_id, patient, &ward_id, type_str, &amount, dt, note);
+        if (n >= 7) {
+            BillingType bt;
+            if (strcmp(type_str, "DEPOSIT") == 0) bt = BILL_DEPOSIT;
+            else if (strcmp(type_str, "TOPUP") == 0) bt = BILL_TOPUP;
+            else if (strcmp(type_str, "CHARGE") == 0) bt = BILL_CHARGE;
+            else if (strcmp(type_str, "REFUND") == 0) bt = BILL_REFUND;
+            else {
+                fprintf(stderr, "警告：第%d行计费类型无效: %s", line_num, line);
+                continue;
+            }
+
+            Billing *b = billing_create(id, inpatient_id, patient, ward_id, bt, amount, dt, (n == 8 ? note : ""));
+            if (b) {
+                billing_insert(&g_billing_head, b);
+            } else {
+                fprintf(stderr, "警告：第%d行计费创建失败（内存不足）\n", line_num);
+            }
+        } else {
+            fprintf(stderr, "警告：第%d行计费格式无效: %s", line_num, line);
+        }
+    }
+
     fclose(fp);
     return 1;
 }
@@ -428,6 +477,35 @@ int save_inpatients(const char *filename) {
     return 1;
 }
 
+// 保存计费流水
+int save_billings(const char *filename) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) return 0;
+
+    fprintf(fp, "id inpatient_id patient_name ward_id type amount datetime note\n");
+    Billing *cur = g_billing_head;
+    while (cur) {
+        const char *type_str = "UNKNOWN";
+        switch (cur->type) {
+            case BILL_DEPOSIT: type_str = "DEPOSIT"; break;
+            case BILL_TOPUP:   type_str = "TOPUP"; break;
+            case BILL_CHARGE:  type_str = "CHARGE"; break;
+            case BILL_REFUND:  type_str = "REFUND"; break;
+            default: break;
+        }
+
+        fprintf(fp, "%d %d %s %d %s %.2f %s %s\n",
+                cur->id, cur->inpatient_id, cur->patient_name, cur->ward_id,
+                type_str, cur->amount,
+                cur->datetime[0] ? cur->datetime : "-",
+                cur->note[0] ? cur->note : "-");
+        cur = cur->next;
+    }
+
+    fclose(fp);
+    return 1;
+}
+
 // ================== 统一入口 ==================
 
 int his_init(const char *data_dir) {
@@ -444,6 +522,7 @@ int his_init(const char *data_dir) {
     sprintf(path, "%s/consultations.txt", data_dir); ok = ok && load_consultations(path);
     sprintf(path, "%s/examinations.txt", data_dir); ok = ok && load_examinations(path);
     sprintf(path, "%s/inpatients.txt", data_dir);  ok = ok && load_inpatients(path);
+    sprintf(path, "%s/billings.txt", data_dir);    ok = ok && load_billings(path);
     return ok;
 }
 
@@ -460,5 +539,6 @@ int his_save(const char *data_dir) {
     sprintf(path, "%s/consultations.txt", data_dir); ok = ok && save_consultations(path);
     sprintf(path, "%s/examinations.txt", data_dir); ok = ok && save_examinations(path);
     sprintf(path, "%s/inpatients.txt", data_dir);  ok = ok && save_inpatients(path);
+    sprintf(path, "%s/billings.txt", data_dir);    ok = ok && save_billings(path);
     return ok;
 }

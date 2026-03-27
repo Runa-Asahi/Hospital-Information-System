@@ -45,11 +45,19 @@ Department* department_find_by_id(Department *head, int id) {
 
 Department* department_find_by_name(Department *head, const char *name) {
     Department *cur = head;
+    Department *result = NULL;
     while (cur) {
-        if (strcmp(cur->name, name) == 0) return cur;
+        if (strcmp(cur->name, name) == 0) {
+            if (!result) {
+                result = cur;
+            } else {
+                printf("警告：找到多个同名科室（ID: %d, ID: %d），请使用科室ID进行唯一查找。\n", result->id, cur->id);
+                return NULL;
+            }
+        }
         cur = cur->next;
     }
-    return NULL;
+    return result;
 }
 
 int department_print_all(Department *head) {

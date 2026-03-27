@@ -1,0 +1,1 @@
+id inpatient_id patient_name ward_id type amount datetime note

@@ -50,11 +50,19 @@ Patient* patient_find_by_id(Patient *head, int id) {
 
 Patient* patient_find_by_name(Patient *head, const char *name) {
     Patient *cur = head;
+    Patient *result = NULL;
     while (cur) {
-        if (strcmp(cur->name, name) == 0) return cur;
+        if (strcmp(cur->name, name) == 0) {
+            if (!result) {
+                result = cur;// 找到匹配的患者
+            } else {
+                printf("警告：找到多个同名患者（ID: %d, ID: %d），请使用ID进行唯一查找。\n", result->id, cur->id);
+                return NULL;// 返回NULL表示有多个同名患者，无法确定唯一结果
+            }
+        }
         cur = cur->next;
     }
-    return NULL;// 未找到
+    return result;// 返回找到的患者或NULL
 }
 
 int patient_update(Patient *p, const char *name, int age, bool gender) {
