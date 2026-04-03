@@ -3,8 +3,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * 模块：药品信息（Drug）
+ * 数据结构：双向链表，表头为 g_drug_head
+ * 关键字段：库存 stock、单价 price、关联科室 department
+ * 持久化：由 file.c 负责 load_drugs/save_drugs
+ */
+
 Drug *g_drug_head = NULL;
 
+/**
+ * 创建药品节点。
+ * @param id         药品ID（唯一）
+ * @param name       通用名
+ * @param alias      别名
+ * @param stock      库存
+ * @param price      单价
+ * @param department 关联科室
+ * @return 成功返回新节点指针；失败返回 NULL
+ */
 Drug* drug_create(int id, const char *name, const char *alias, int stock, float price, const char *department) {
     Drug *d = (Drug*)malloc(sizeof(Drug));
     if (!d) return NULL;
@@ -18,6 +35,10 @@ Drug* drug_create(int id, const char *name, const char *alias, int stock, float 
     return d;
 }
 
+/**
+ * 插入药品节点到链表头部。
+ * @return 成功返回 1；失败返回 0
+ */
 int drug_insert(Drug **head, Drug *node) {
     if (!head || !node) return 0;
     node->next = *head;
@@ -26,6 +47,10 @@ int drug_insert(Drug **head, Drug *node) {
     return 1;
 }
 
+/**
+ * 按药品ID删除节点。
+ * @return 成功返回 1；未找到/参数无效返回 0
+ */
 int drug_delete(Drug **head, int id) {
     if (!head || !*head) return 0;
     Drug *cur = *head;
@@ -40,6 +65,10 @@ int drug_delete(Drug **head, int id) {
     return 1;
 }
 
+/**
+ * 按药品ID查找。
+ * @return 找到返回指针；否则返回 NULL
+ */
 Drug* drug_find_by_id(Drug *head, int id) {
     Drug *cur = head;
     while (cur) {
@@ -49,6 +78,10 @@ Drug* drug_find_by_id(Drug *head, int id) {
     return NULL;
 }
 
+/**
+ * 按通用名查找（要求唯一）。
+ * @note 若存在重名，会提示并返回 NULL。
+ */
 Drug* drug_find_by_name(Drug *head, const char *name) {
     Drug *cur = head;
     Drug *result = NULL;
@@ -66,7 +99,13 @@ Drug* drug_find_by_name(Drug *head, const char *name) {
     return result;
 }
 
-int drug_update_stock(Drug *d, int delta) {// delta可正可负
+/**
+ * 更新库存。
+ * @param d     药品节点
+ * @param delta 库存变化量（可正可负）；下限截断为 0
+ * @return 成功返回 1；失败返回 0
+ */
+int drug_update_stock(Drug *d, int delta) {
     if (!d) return 0;
     int new_stock = d->stock + delta;
     if (new_stock < 0) new_stock = 0;   // 防止负数
@@ -74,6 +113,10 @@ int drug_update_stock(Drug *d, int delta) {// delta可正可负
     return 1;
 }
 
+/**
+ * 打印药品列表。
+ * @return 打印的记录条数
+ */
 int drug_print_all(Drug *head) {
     Drug *cur = head;
     int count = 0;
@@ -87,6 +130,10 @@ int drug_print_all(Drug *head) {
     return count;
 }
 
+/**
+ * 释放药品链表全部节点。
+ * @return 释放的节点数量
+ */
 int drug_free_all(Drug **head) {
     if (!head) return 0;
     Drug *cur = *head;

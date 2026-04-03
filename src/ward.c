@@ -3,8 +3,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * 模块：病房信息（Ward）
+ * 数据结构：双向链表，表头为 g_ward_head
+ * 关键字段：type（Single/Double/Triple/ICU 等）、床位占用 occupied_beds
+ * @note occupied_beds 会在住院模块 inpatient.c 中随入院/出院自动同步更新。
+ * 持久化：由 file.c 负责 load_wards/save_wards
+ */
+
 Ward *g_ward_head = NULL;
 
+/**
+ * 创建病房节点。
+ * @param id         病房ID（唯一）
+ * @param type       病房类型（Single/Double/Triple/ICU 等）
+ * @param total_beds 总床位数
+ * @param department 关联科室
+ * @param can_convert 是否可转换（0/1）
+ * @return 成功返回新节点指针；失败返回 NULL
+ */
 Ward* ward_create(int id, const char *type, int total_beds, const char *department, int can_convert) {
     Ward *w = (Ward*)malloc(sizeof(Ward));
     if (!w) return NULL;
@@ -18,7 +35,11 @@ Ward* ward_create(int id, const char *type, int total_beds, const char *departme
     return w;
 }
 
-int ward_insert(Ward **head, Ward *node) {// 插入病房节点到链表头部
+/**
+ * 插入病房节点到链表头部。
+ * @return 成功返回 1；失败返回 0
+ */
+int ward_insert(Ward **head, Ward *node) {
     if (!head || !node) return 0;
     node->next = *head;
     if (*head) (*head)->prev = node;
@@ -26,7 +47,11 @@ int ward_insert(Ward **head, Ward *node) {// 插入病房节点到链表头部
     return 1;
 }
 
-int ward_delete(Ward **head, int id) {// 根据ID删除病房
+/**
+ * 按病房ID删除节点。
+ * @return 成功返回 1；未找到/参数无效返回 0
+ */
+int ward_delete(Ward **head, int id) {
     if (!head || !*head) return 0;
     Ward *cur = *head;
     while (cur && cur->id != id) cur = cur->next;
@@ -38,7 +63,11 @@ int ward_delete(Ward **head, int id) {// 根据ID删除病房
     return 1;
 }
 
-Ward* ward_find_by_id(Ward *head, int id) {// 根据ID查找病房
+/**
+ * 按病房ID查找。
+ * @return 找到返回指针；否则返回 NULL
+ */
+Ward* ward_find_by_id(Ward *head, int id) {
     Ward *cur = head;
     while (cur) {
         if (cur->id == id) return cur;
@@ -47,7 +76,11 @@ Ward* ward_find_by_id(Ward *head, int id) {// 根据ID查找病房
     return NULL;
 }
 
-int ward_free_beds(const Ward *w) {// 返回空床数量；如果病房不存在或数据异常则返回0。
+/**
+ * 计算空床数量。
+ * @return 空床数；若 w 无效/数据异常则返回 0
+ */
+int ward_free_beds(const Ward *w) {
     if (!w) return 0;
     if (w->total_beds <= 0) return 0;
     if (w->occupied_beds < 0) return w->total_beds;
@@ -55,7 +88,12 @@ int ward_free_beds(const Ward *w) {// 返回空床数量；如果病房不存在
     return w->total_beds - w->occupied_beds;
 }
 
-Ward* ward_find_available_by_type(Ward *head, const char *type, int required_free_beds) {// 在同类型病房中优先选择空闲床位最多的；如果没有满足条件的病房则返回NULL。
+/**
+ * 在同类型病房中择优选择空床最多的病房。
+ * @param required_free_beds 至少需要的空床数（<=0 视为 1）
+ * @return 找到返回病房指针；否则返回 NULL
+ */
+Ward* ward_find_available_by_type(Ward *head, const char *type, int required_free_beds) {
     if (!head || !type) return NULL;
     if (required_free_beds <= 0) required_free_beds = 1;
 
@@ -81,25 +119,40 @@ Ward* ward_find_by_type(Ward *head, const char *type) {
     return ward_find_available_by_type(head, type, 1);
 }
 
-int ward_has_free_bed(Ward *w) {// 是否至少有1张空床
+/**
+ * 是否至少有 1 张空床。
+ */
+int ward_has_free_bed(Ward *w) {
     return ward_free_beds(w) > 0;
 }
 
-int ward_occupy_bed(Ward *w) {// 占用1张床
+/**
+ * 占用 1 张床。
+ * @return 成功返回 1；无空床/参数无效返回 0
+ */
+int ward_occupy_bed(Ward *w) {
     if (!w) return 0;
     if (!ward_has_free_bed(w)) return 0;
     w->occupied_beds++;
     return 1;
 }
 
-int ward_release_bed(Ward *w) {// 释放1张床
+/**
+ * 释放 1 张床。
+ * @return 成功返回 1；occupied_beds 已为 0 或参数无效返回 0
+ */
+int ward_release_bed(Ward *w) {
     if (!w) return 0;
     if (w->occupied_beds <= 0) return 0;
     w->occupied_beds--;
     return 1;
 }
 
-int ward_print_all(Ward *head) {// 打印病房列表，返回病房总数
+/**
+ * 打印病房列表。
+ * @return 打印的记录条数
+ */
+int ward_print_all(Ward *head) {
     Ward *cur = head;
     int count = 0;
     printf("病房列表：\n");
@@ -113,7 +166,11 @@ int ward_print_all(Ward *head) {// 打印病房列表，返回病房总数
     return count;
 }
 
-int ward_free_all(Ward **head) {// 释放病房链表所有节点，返回释放的节点数量
+/**
+ * 释放病房链表全部节点。
+ * @return 释放的节点数量
+ */
+int ward_free_all(Ward **head) {
     if (!head) return 0;
     Ward *cur = *head;
     int count = 0;

@@ -1,35 +1,57 @@
-#include "his.h"
-#include <locale.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "his.h"// 统一包含 his.h，获取各模块数据结构与全局表头指针
+#include <locale.h>// setlocale 函数
+#include <stdio.h>// 文件 I/O
+#include <stdlib.h>// malloc/free
+#include <string.h>// 字符串处理
 
+#ifdef _WIN32       // Windows 特有的控制台编码设置
+#include <windows.h> // SetConsoleOutputCP, SetConsoleCP// CP_UTF8
+#endif// 其他平台默认 UTF-8，无需特殊处理
+
+/*
+ * 模块：文件读写与系统初始化（load/save + init）
+ * 作用：把 data/ 目录下各类 .txt 文本数据加载到各模块双向链表；并将内存数据写回文本文件
+ * 文件约定：
+ *  - 首行是标题行（字段名），加载时跳过
+ *  - 空行跳过
+ *  - 字段默认以空白分隔；个别字段允许包含空格（使用 %[^\n] 读取剩余部分）
+ *  - 加载失败（文件不存在）按“无数据”处理，返回 0；init 会累计 ok
+ * 注意：本模块只做 I/O 与初始化；数据合法性与业务规则由各业务模块负责
+ */
+
+/**
+ * 初始化控制台编码/Locale（主要用于 Windows 下 UTF-8 中文输出）。
+ * @return 成功返回 1
+ */
+int his_console_init(void) {// Windows 下切换到 UTF-8 编码；尽可能启用 UTF-8 locale
 #ifdef _WIN32
-#include <windows.h>
+    /*
+     * Windows 控制台默认常为 CP936(GBK)，源码若为 UTF-8 会导致中文乱码。
+     * 切到 UTF-8 以便正确显示 UTF-8 字节序列。
+     */
+    SetConsoleOutputCP(CP_UTF8);// 输出编码
+    SetConsoleCP(CP_UTF8);// 输入编码
 #endif
 
-int his_console_init(void) {
-#ifdef _WIN32
-    // Windows 控制台默认常为 CP936(GBK)，源码若为 UTF-8 会导致中文乱码。
-    // 切到 UTF-8 以便正确显示 UTF-8 字节序列。
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-#endif
-
-    // 尽可能启用 UTF-8 locale；失败则回退到系统默认 locale。
-    if (!setlocale(LC_ALL, ".UTF8")) {
-        setlocale(LC_ALL, "");
+    /* 尽可能启用 UTF-8 locale；失败则回退到系统默认 locale。 */
+    if (!setlocale(LC_ALL, ".UTF8")) {// 尝试启用 UTF-8 locale
+        setlocale(LC_ALL, "");// 回退到系统默认 locale
     }
 
     return 1;
 }
 
-// ================== 加载函数 ==================
+/* ================== 加载函数 ================== */
 
-// 加载患者数据
+/**
+ * 从文本文件加载患者数据到 g_patient_head。
+ * @param filename patients.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id age gender name
+ */
 int load_patients(const char *filename) {
     FILE *fp = fopen(filename, "r");
-    if (!fp) return 0; // 文件不存在，正常返回
+    if (!fp) return 0; /* 文件不存在，按“无数据”处理 */
 
     char line[256];
     int line_num = 0;
@@ -57,7 +79,13 @@ int load_patients(const char *filename) {
     return 1;
 }
 
-// 加载医生数据
+/**
+ * 从文本文件加载医生数据到 g_doctor_head。
+ * @param filename doctors.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id age gender name department title schedule
+ *       schedule 允许包含空格（读取到行尾）。
+ */
 int load_doctors(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -87,7 +115,12 @@ int load_doctors(const char *filename) {
     return 1;
 }
 
-// 加载药品数据
+/**
+ * 从文本文件加载药品数据到 g_drug_head。
+ * @param filename drugs.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id stock price name alias department
+ */
 int load_drugs(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -117,7 +150,12 @@ int load_drugs(const char *filename) {
     return 1;
 }
 
-// 加载科室数据
+/**
+ * 从文本文件加载科室数据到 g_department_head。
+ * @param filename departments.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id name
+ */
 int load_departments(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -145,7 +183,12 @@ int load_departments(const char *filename) {
     return 1;
 }
 
-// 加载病房数据
+/**
+ * 从文本文件加载病房数据到 g_ward_head。
+ * @param filename wards.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id type total_beds department can_convert
+ */
 int load_wards(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -174,7 +217,12 @@ int load_wards(const char *filename) {
     return 1;
 }
 
-// 加载挂号记录
+/**
+ * 从文本文件加载挂号记录到 g_register_head。
+ * @param filename registers.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id patient_name doctor_name date
+ */
 int load_registers(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -203,7 +251,13 @@ int load_registers(const char *filename) {
     return 1;
 }
 
-// 加载看诊记录
+/**
+ * 从文本文件加载看诊记录到 g_consultation_head。
+ * @param filename consultations.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id patient_name doctor_name date diagnosis prescription
+ *       diagnosis 与 prescription 允许包含空格（按当前实现规则解析）。
+ */
 int load_consultations(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -233,7 +287,12 @@ int load_consultations(const char *filename) {
     return 1;
 }
 
-// 加载检查记录
+/**
+ * 从文本文件加载检查记录到 g_examination_head。
+ * @param filename examinations.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id patient_name item cost date
+ */
 int load_examinations(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -263,7 +322,13 @@ int load_examinations(const char *filename) {
     return 1;
 }
 
-// 加载住院记录
+/**
+ * 从文本文件加载住院记录到 g_inpatient_head。
+ * @param filename inpatients.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note 格式：首行标题；后续行：id patient_name ward_id bed_num deposit admit_date discharge_date
+ *       discharge_date 可为空（表示未出院）。
+ */
 int load_inpatients(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -295,7 +360,12 @@ int load_inpatients(const char *filename) {
     return 1;
 }
 
-// 加载计费流水
+/**
+ * 从文本文件加载计费流水到 g_billing_head。
+ * @param filename billings.txt 路径
+ * @return 成功返回 1；文件不存在返回 0
+ * @note type 取值：DEPOSIT/TOPUP/CHARGE/REFUND；note 可选。
+ */
 int load_billings(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) return 0;
@@ -342,9 +412,13 @@ int load_billings(const char *filename) {
     return 1;
 }
 
-// ================== 保存函数 ==================
+/* ================== 保存函数 ================== */
 
-// 保存患者数据
+/**
+ * 保存患者数据 g_patient_head 到文本文件。
+ * @param filename patients.txt 路径
+ * @return 成功返回 1；失败返回 0
+ */
 int save_patients(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -358,7 +432,9 @@ int save_patients(const char *filename) {
     return 1;
 }
 
-// 保存医生数据
+/**
+ * 保存医生数据 g_doctor_head 到文本文件。
+ */
 int save_doctors(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -374,7 +450,9 @@ int save_doctors(const char *filename) {
     return 1;
 }
 
-// 保存药品数据
+/**
+ * 保存药品数据 g_drug_head 到文本文件。
+ */
 int save_drugs(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -389,7 +467,9 @@ int save_drugs(const char *filename) {
     return 1;
 }
 
-// 保存科室数据
+/**
+ * 保存科室数据 g_department_head 到文本文件。
+ */
 int save_departments(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -403,7 +483,9 @@ int save_departments(const char *filename) {
     return 1;
 }
 
-// 保存病房数据
+/**
+ * 保存病房数据 g_ward_head 到文本文件。
+ */
 int save_wards(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -417,7 +499,9 @@ int save_wards(const char *filename) {
     return 1;
 }
 
-// 保存挂号记录
+/**
+ * 保存挂号记录 g_register_head 到文本文件。
+ */
 int save_registers(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -431,7 +515,9 @@ int save_registers(const char *filename) {
     return 1;
 }
 
-// 保存看诊记录
+/**
+ * 保存看诊记录 g_consultation_head 到文本文件。
+ */
 int save_consultations(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -447,7 +533,9 @@ int save_consultations(const char *filename) {
     return 1;
 }
 
-// 保存检查记录
+/**
+ * 保存检查记录 g_examination_head 到文本文件。
+ */
 int save_examinations(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -461,7 +549,9 @@ int save_examinations(const char *filename) {
     return 1;
 }
 
-// 保存住院记录
+/**
+ * 保存住院记录 g_inpatient_head 到文本文件。
+ */
 int save_inpatients(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -477,7 +567,9 @@ int save_inpatients(const char *filename) {
     return 1;
 }
 
-// 保存计费流水
+/**
+ * 保存计费流水 g_billing_head 到文本文件。
+ */
 int save_billings(const char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) return 0;
@@ -506,8 +598,13 @@ int save_billings(const char *filename) {
     return 1;
 }
 
-// ================== 统一入口 ==================
+/* ================== 统一入口 ================== */
 
+/**
+ * 初始化：按 data_dir 依次加载各表数据到内存链表。
+ * @param data_dir 数据目录（如 "data"）
+ * @return 全部加载成功返回 1；任一加载失败返回 0
+ */
 int his_init(const char *data_dir) {
     if (!data_dir) return 0;
     (void)his_console_init();
@@ -526,6 +623,11 @@ int his_init(const char *data_dir) {
     return ok;
 }
 
+/**
+ * 保存：按 data_dir 依次将各表数据写回到文本文件。
+ * @param data_dir 数据目录（如 "data"）
+ * @return 全部保存成功返回 1；任一保存失败返回 0
+ */
 int his_save(const char *data_dir) {
     if (!data_dir) return 0;
     char path[256];

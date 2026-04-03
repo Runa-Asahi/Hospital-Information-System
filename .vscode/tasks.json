@@ -1,0 +1,70 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build HIS",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "-Wall",
+        "-Wextra",
+        "-g3",
+        "-std=c11",
+        "-I",
+        "headfile",
+        "src/billing.c",
+        "src/consultation.c",
+        "src/department.c",
+        "src/doctor.c",
+        "src/drug.c",
+        "src/examination.c",
+        "src/file.c",
+        "src/inpatient.c",
+        "src/main.c",
+        "src/patient.c",
+        "src/register.c",
+        "src/report.c",
+        "src/ward.c",
+        "-o",
+        "his.exe"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$gcc"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Run HIS",
+      "type": "shell",
+      "command": "${workspaceFolder}\\his.exe",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Build HIS",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run HIS (CMD Window)",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/d",
+        "/c",
+        "start",
+        "\"HIS\"",
+        "cmd",
+        "/k",
+        "\"${workspaceFolder}\\his.exe\""
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Build HIS",
+      "problemMatcher": []
+    }
+  ]
+}

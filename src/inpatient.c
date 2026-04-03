@@ -3,8 +3,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * 模块：住院记录（Inpatient）
+ * 数据结构：双向链表，表头为 g_inpatient_head
+ * 题签计费：押金余额 deposit 作为“余额字段”；具体缴费/扣费/退费落在计费流水 Billing
+ * 关键规则：
+ *  - 入院办理：押金需为 100 的整数倍，且不低于 200*N（N 为拟住院天数）
+ *  - 出院结算：00:00-08:00 不收当天费；08:00 后计入当天（由 billing.c 负责）
+ * 持久化：由 file.c 负责 load_inpatients/save_inpatients
+ */
+
 Inpatient *g_inpatient_head = NULL;
 
+/**
+ * 创建住院记录节点。
+ * @param id             住院ID（唯一）
+ * @param patient        患者姓名
+ * @param ward_id        病房ID
+ * @param bed_num        床位号（1..total_beds）
+ * @param deposit        押金余额
+ * @param admit_date     入院日期/时间字符串（YYYY-MM-DD 或带时分）
+ * @param discharge_date 出院日期/时间字符串；为空串表示未出院
+ * @return 成功返回新节点指针；失败返回 NULL
+ */
 Inpatient* inpatient_create(int id, const char *patient, int ward_id, int bed_num,
                             float deposit, const char *admit_date, const char *discharge_date) {
     Inpatient *ip = (Inpatient*)malloc(sizeof(Inpatient));
@@ -23,6 +44,9 @@ Inpatient* inpatient_create(int id, const char *patient, int ward_id, int bed_nu
     return ip;
 }
 
+/**
+ * 生成下一住院ID（当前最大ID + 1）。
+ */
 int inpatient_next_id(Inpatient *head) {
     int max_id = 0;
     for (Inpatient *cur = head; cur; cur = cur->next) {
@@ -61,6 +85,7 @@ static int inpatient_find_free_bed_num(Inpatient *head, int ward_id, int total_b
 int inpatient_admit_auto(Inpatient **ihead, Billing **bhead, Ward *ward_head,
                          int inpatient_id, const char *patient_name, const char *ward_type,
                          float deposit, int planned_days, const char *admit_datetime) {
+    // 题签“一键办理住院”：择优选有空床的病房、自动分配床位号、押金规则校验、生成押金流水。
     if (!ihead || !bhead || !ward_head || !patient_name || !ward_type || !admit_datetime) return 0;
 
     if (!billing_validate_initial_deposit(deposit, planned_days)) {
@@ -109,6 +134,10 @@ int inpatient_admit_auto(Inpatient **ihead, Billing **bhead, Ward *ward_head,
     return 1;
 }
 
+/**
+ * 插入住院记录节点到链表头部，并同步病房 occupied_beds。
+ * @note 仅“未出院记录”会占用床位。
+ */
 int inpatient_insert(Inpatient **head, Inpatient *node) {
     if (!head || !node) return 0;
     node->next = *head;
@@ -129,6 +158,10 @@ int inpatient_insert(Inpatient **head, Inpatient *node) {
     return 1;
 }
 
+/**
+ * 按住院ID删除记录，并在必要时释放床位。
+ * @note 仅删除“未出院记录”会触发释放床位。
+ */
 int inpatient_delete(Inpatient **head, int id) {
     if (!head || !*head) return 0;
     Inpatient *cur = *head;
@@ -152,6 +185,9 @@ int inpatient_delete(Inpatient **head, int id) {
     return 1;
 }
 
+/**
+ * 按住院ID查找。
+ */
 Inpatient* inpatient_find_by_id(Inpatient *head, int id) {
     Inpatient *cur = head;
     while (cur) {
@@ -161,6 +197,9 @@ Inpatient* inpatient_find_by_id(Inpatient *head, int id) {
     return NULL;
 }
 
+/**
+ * 按患者姓名查找住院记录（返回第一个匹配）。
+ */
 Inpatient* inpatient_find_by_patient(Inpatient *head, const char *patient) {
     Inpatient *cur = head;
     while (cur) {
@@ -170,6 +209,10 @@ Inpatient* inpatient_find_by_patient(Inpatient *head, const char *patient) {
     return NULL;
 }
 
+/**
+ * 更新出院日期/时间。
+ * @note 若从“未出院”变为“已出院”，会释放床位并触发出院结算（billing_settle_on_discharge）。
+ */
 int inpatient_update_discharge(Inpatient *ip, const char *discharge_date) {
     if (!ip || !discharge_date || discharge_date[0] == '\0') return 0;
 
@@ -198,6 +241,10 @@ int inpatient_update_discharge(Inpatient *ip, const char *discharge_date) {
     return 1;
 }
 
+/**
+ * 打印住院记录列表。
+ * @return 打印的记录条数
+ */
 int inpatient_print_all(Inpatient *head) {
     Inpatient *cur = head;
     int count = 0;
@@ -212,6 +259,10 @@ int inpatient_print_all(Inpatient *head) {
     return count;
 }
 
+/**
+ * 释放住院记录链表全部节点。
+ * @return 释放的节点数量
+ */
 int inpatient_free_all(Inpatient **head) {
     if (!head) return 0;
     Inpatient *cur = *head;

@@ -3,7 +3,14 @@
 
 #include <stdbool.h>
 
-// 患者
+/*
+ * Hospital Information System (HIS)
+ * 说明：本头文件定义系统核心数据结构、全局链表表头，以及各模块对外接口声明。
+ * 数据结构约定：各表均为双向链表（prev/next），由对应模块维护与释放。
+ * 持久化约定：data/ 目录下各类 .txt 文件首行为标题行；加载时跳过，保存时写回。
+ */
+
+/** 患者信息（Patient）。 */
 typedef struct Patient {
     int id;                     // 唯一ID
     char name[50];
@@ -13,7 +20,7 @@ typedef struct Patient {
     struct Patient *next;
 } Patient;
 
-// 医生
+/** 医生信息（Doctor）。 */
 typedef struct Doctor {
     int id;                     // 工号
     char name[50];
@@ -26,7 +33,7 @@ typedef struct Doctor {
     struct Doctor *next;
 } Doctor;
 
-// 药品
+/** 药品信息（Drug）。 */
 typedef struct Drug {
     int id;
     char name[50];              // 通用名
@@ -38,7 +45,7 @@ typedef struct Drug {
     struct Drug *next;
 } Drug;
 
-// 科室
+/** 科室信息（Department）。 */
 typedef struct Department {
     int id;
     char name[50];
@@ -46,7 +53,7 @@ typedef struct Department {
     struct Department *next;
 } Department;
 
-// 病房
+/** 病房信息（Ward）。 */
 typedef struct Ward {
     int id;
     char type[20];              // 病房类型（单人、双人、重症等）
@@ -58,7 +65,7 @@ typedef struct Ward {
     struct Ward *next;
 } Ward;
 
-// 挂号记录
+/** 挂号记录（Register）。 */
 typedef struct Register {
     int id;                     // 挂号ID
     char patient_name[50];
@@ -68,43 +75,43 @@ typedef struct Register {
     struct Register *next;
 } Register;
 
-// 看诊记录
+/** 看诊记录（Consultation）。 */
 typedef struct Consultation {
     int id;
     char patient_name[50];
     char doctor_name[50];
     char date[20];
-    char diagnosis[200];// 诊断结果
-    char prescription[200];// 处方
+    char diagnosis[200];         // 诊断结果
+    char prescription[200];      // 处方
     struct Consultation *prev;
     struct Consultation *next;
 } Consultation;
 
-// 检查记录
+/** 检查记录（Examination）。 */
 typedef struct Examination {
     int id;
     char patient_name[50];
-    char item[50];// 检查项目
+    char item[50];               // 检查项目
     float cost;
     char date[20];
     struct Examination *prev;
     struct Examination *next;
 } Examination;
 
-// 住院记录
+/** 住院记录（Inpatient）。deposit 字段作为“押金余额”。 */
 typedef struct Inpatient {
-    int id;// 住院ID
-    char patient_name[50];// 患者姓名
-    int ward_id;// 病房ID
-    int bed_num;// 床位号
-    float deposit;// 押金
-    char admit_date[20];// 入院日期
+    int id;                      // 住院ID
+    char patient_name[50];       // 患者姓名
+    int ward_id;                 // 病房ID
+    int bed_num;                 // 床位号
+    float deposit;               // 押金余额
+    char admit_date[20];         // 入院日期/时间
     char discharge_date[20];    // 未出院可为空
     struct Inpatient *prev;
     struct Inpatient *next;
 } Inpatient;
 
-// 计费流水
+/** 计费流水类型（BillingType）。 */
 typedef enum BillingType {
     BILL_DEPOSIT = 0,   // 入院押金
     BILL_TOPUP   = 1,   // 补缴押金
@@ -112,6 +119,7 @@ typedef enum BillingType {
     BILL_REFUND  = 3    // 退费
 } BillingType;
 
+/** 计费流水记录（Billing）。 */
 typedef struct Billing {
     int id;                 // 流水ID
     int inpatient_id;       // 关联住院ID
@@ -125,6 +133,10 @@ typedef struct Billing {
     struct Billing *next;
 } Billing;
 
+/**
+ * 全局链表表头：由各模块维护。
+ * @note 仅声明，定义位于各自 .c 文件中。
+ */
 extern Patient *g_patient_head;
 extern Doctor  *g_doctor_head;
 extern Drug    *g_drug_head;
@@ -137,9 +149,17 @@ extern Inpatient *g_inpatient_head;
 extern Billing *g_billing_head;
 
 /* ==================== 控制台编码 ==================== */
+/**
+ * 初始化控制台编码/Locale（主要用于 Windows 下 UTF-8 中文输出）。
+ * @return 成功返回 1
+ */
 int his_console_init(void);
 
 /* ==================== 文件读写/初始化 ==================== */
+/**
+ * 加载/保存函数：把 data/ 目录下各类 .txt 文件映射到全局链表。
+ * @return 成功返回 1；失败返回 0
+ */
 int load_patients(const char *filename);
 int load_doctors(const char *filename);
 int load_drugs(const char *filename);
@@ -162,7 +182,14 @@ int save_examinations(const char *filename);
 int save_inpatients(const char *filename);
 int save_billings(const char *filename);
 
+/**
+ * 系统初始化：按 data_dir 加载各表。
+ */
 int his_init(const char *data_dir);
+
+/**
+ * 系统保存：按 data_dir 保存各表。
+ */
 int his_save(const char *data_dir);
 
 /* ==================== 患者模块 ==================== */
@@ -239,6 +266,13 @@ int consultation_insert(Consultation **head, Consultation *node);
 int consultation_delete(Consultation **head, int id);
 Consultation* consultation_find_by_id(Consultation *head, int id);
 int consultation_print_by_patient(Consultation *head, const char *patient);
+int consultation_print_all(Consultation *head);
+/**
+ * 题签：规范化修改流程（撤销+补录）。
+ * 说明：撤销旧记录（打印原因），避免直接“改写历史”。
+ * @return 成功撤销返回 1；失败返回 0
+ */
+int consultation_revoke(Consultation *head, int id, const char *reason);
 int consultation_free_all(Consultation **head);
 
 /* ==================== 检查模块 ==================== */
@@ -247,7 +281,21 @@ int examination_insert(Examination **head, Examination *node);
 int examination_delete(Examination **head, int id);
 Examination* examination_find_by_id(Examination *head, int id);
 int examination_print_by_patient(Examination *head, const char *patient);
+int examination_print_all(Examination *head);
 int examination_free_all(Examination **head);
+
+/* ==================== 汇总/统计（题签扩展查询） ==================== */
+/** 患者维度：打印该患者所有业务记录（挂号/看诊/检查/住院/计费）。 */
+int his_print_patient_history(const char *patient_name);
+
+/** 医生维度：按医生工号汇总（挂号数量/看诊数量；可选按日期）。 */
+int his_summary_by_doctor_id(int doctor_id, const char *date_opt);
+
+/** 科室维度：按科室名称汇总（按医生所属科室归集挂号/看诊数量）。 */
+int his_summary_by_department(const char *department_name, const char *start_date_opt, const char *end_date_opt);
+
+/** 时间范围维度：汇总全院业务记录数量（挂号/看诊/检查/住院/计费等）。 */
+int his_summary_by_date_range(const char *start_date, const char *end_date);
 
 /* ==================== 住院模块 ==================== */
 Inpatient* inpatient_create(int id, const char *patient, int ward_id, int bed_num,
