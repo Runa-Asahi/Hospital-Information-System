@@ -27,9 +27,12 @@ Consultation *g_consultation_head = NULL;
  */
 Consultation* consultation_create(int id, const char *patient, const char *doctor,
                                   const char *date, const char *diagnosis, const char *prescription) {
+                                    //diagnosis: 诊断结果；prescription：处方信息
     Consultation *c = (Consultation*)malloc(sizeof(Consultation));
     if (!c) return NULL;
     c->id = id;
+    //strcpy函数用于字符串复制，确保目标数组有足够的空间来存储源字符串，并且源字符串以 null 结尾。
+    //strcpy函数原型为：char *strcpy(char *dest, const char *src);
     strcpy(c->patient_name, patient);
     strcpy(c->doctor_name, doctor);
     strcpy(c->date, date);
@@ -39,10 +42,6 @@ Consultation* consultation_create(int id, const char *patient, const char *docto
     return c;
 }
 
-/**
- * 插入看诊记录节点到链表头部。
- * @return 成功返回 1；失败返回 0
- */
 int consultation_insert(Consultation **head, Consultation *node) {
     if (!head || !node) return 0;
     node->next = *head;
@@ -51,10 +50,6 @@ int consultation_insert(Consultation **head, Consultation *node) {
     return 1;
 }
 
-/**
- * 按记录ID删除看诊记录。
- * @return 成功返回 1；未找到/参数无效返回 0
- */
 int consultation_delete(Consultation **head, int id) {
     if (!head || !*head) return 0;
     Consultation *cur = *head;
@@ -67,10 +62,6 @@ int consultation_delete(Consultation **head, int id) {
     return 1;
 }
 
-/**
- * 按记录ID查找。
- * @return 找到返回指针；否则返回 NULL
- */
 Consultation* consultation_find_by_id(Consultation *head, int id) {
     Consultation *cur = head;
     while (cur) {
@@ -80,10 +71,6 @@ Consultation* consultation_find_by_id(Consultation *head, int id) {
     return NULL;
 }
 
-/**
- * 打印某患者的看诊记录。
- * @return 若找到至少一条返回 1；否则返回 0
- */
 int consultation_print_by_patient(Consultation *head, const char *patient) {
     if (!patient) return 0;
     Consultation *cur = head;
@@ -134,8 +121,8 @@ int consultation_revoke(Consultation *head, int id, const char *reason) {
     char pres_buf[200];
 
     // 预留空间，避免溢出；若内容过长则截断。
-    snprintf(diag_buf, sizeof(diag_buf), "[REVOKED:%s] %s", reason, c->diagnosis);
-    snprintf(pres_buf, sizeof(pres_buf), "[REVOKED] %s", c->prescription);
+    snprintf(diag_buf, sizeof(diag_buf), "[REVOKED:%.64s] %.120s", reason, c->diagnosis);
+    snprintf(pres_buf, sizeof(pres_buf), "[REVOKED] %.180s", c->prescription);
     strncpy(c->diagnosis, diag_buf, sizeof(c->diagnosis) - 1);
     c->diagnosis[sizeof(c->diagnosis) - 1] = '\0';
     strncpy(c->prescription, pres_buf, sizeof(c->prescription) - 1);

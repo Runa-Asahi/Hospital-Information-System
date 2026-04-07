@@ -3,6 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 /*
  * 模块：控制台入口与菜单（main）
  * 作用：提供题签要求的交互式菜单，串联各模块增删改查、住院计费、撤销+补录、统计报表、保存退出
@@ -13,7 +18,7 @@
 /**
  * 去除 fgets 读入的行尾换行符（\r/\n）。
  */
-static void trim_newline(char *s) {
+static void trim_newline(char *s) {// 从字符串末尾开始，逐个检查并去除 \r 或 \n
     if (!s) return;
     size_t n = strlen(s);
     while (n > 0 && (s[n - 1] == '\n' || s[n - 1] == '\r')) {
@@ -644,16 +649,68 @@ static void billing_menu(void) {
     }
 }
 
-/**
- * 程序入口：初始化加载 -> 循环菜单 -> 可选保存 -> 释放内存退出。
- */
-int main(void) {
-    (void)his_console_init();
+static void release_all_lists(void) {
+    patient_free_all(&g_patient_head);
+    doctor_free_all(&g_doctor_head);
+    department_free_all(&g_department_head);
+    drug_free_all(&g_drug_head);
+    ward_free_all(&g_ward_head);
+    register_free_all(&g_register_head);
+    consultation_free_all(&g_consultation_head);
+    examination_free_all(&g_examination_head);
+    inpatient_free_all(&g_inpatient_head);
+    billing_free_all(&g_billing_head);
+}
 
-    if (!his_init("data")) {
-        printf("提示：初始化加载未完全成功（可能存在缺失文件），可继续运行。\n");
+void his_release_all(void) {
+    release_all_lists();
+}
+
+int his_console_run_operation(int op) {
+    switch (op) {
+        case 1:
+            (void)patient_print_all(g_patient_head);
+            (void)doctor_print_all(g_doctor_head);
+            (void)department_print_all(g_department_head);
+            (void)drug_print_all(g_drug_head);
+            (void)ward_print_all(g_ward_head);
+            return 1;
+        case 2:
+            (void)register_print_all(g_register_head);
+            (void)consultation_print_all(g_consultation_head);
+            (void)examination_print_all(g_examination_head);
+            (void)inpatient_print_all(g_inpatient_head);
+            (void)billing_print_all(g_billing_head);
+            return 1;
+        case 3:
+            add_basic();
+            return 1;
+        case 4:
+            add_business();
+            return 1;
+        case 5:
+            modify_menu();
+            return 1;
+        case 6:
+            query_menu();
+            return 1;
+        case 7:
+            summary_menu();
+            return 1;
+        case 8:
+            billing_menu();
+            return 1;
+        case 9:
+            if (!his_save("data")) printf("保存失败\n");
+            else printf("保存完成\n");
+            return 1;
+        default:
+            printf("无效选择\n");
+            return 0;
     }
+}
 
+int his_console_main(void) {
     for (;;) {
         int op = -1;
         menu_print();
@@ -668,60 +725,52 @@ int main(void) {
             break;
         }
 
-        switch (op) {
-            case 1:
-                (void)patient_print_all(g_patient_head);
-                (void)doctor_print_all(g_doctor_head);
-                (void)department_print_all(g_department_head);
-                (void)drug_print_all(g_drug_head);
-                (void)ward_print_all(g_ward_head);
-                break;
-            case 2:
-                (void)register_print_all(g_register_head);
-                (void)consultation_print_all(g_consultation_head);
-                (void)examination_print_all(g_examination_head);
-                (void)inpatient_print_all(g_inpatient_head);
-                (void)billing_print_all(g_billing_head);
-                break;
-            case 3:
-                add_basic();
-                break;
-            case 4:
-                add_business();
-                break;
-            case 5:
-                modify_menu();
-                break;
-            case 6:
-                query_menu();
-                break;
-            case 7:
-                summary_menu();
-                break;
-            case 8:
-                billing_menu();
-                break;
-            case 9:
-                if (!his_save("data")) printf("保存失败\n");
-                else printf("保存完成\n");
-                break;
-            default:
-                printf("无效选择\n");
-                break;
-        }
+        (void)his_console_run_operation(op);
+    }
+    return 0;
+}
+
+/**
+ * 程序入口：默认启动图形化主界面；如需原控制台菜单，使用参数 --console。
+ */
+int main(int argc, char **argv) {
+    int run_console = 0;
+    if (argc >= 2 && argv && argv[1] && (strcmp(argv[1], "--console") == 0 || strcmp(argv[1], "-c") == 0)) {
+        run_console = 1;
     }
 
-    /* 释放内存（按模块释放，避免泄漏） */
-    patient_free_all(&g_patient_head);
-    doctor_free_all(&g_doctor_head);
-    department_free_all(&g_department_head);
-    drug_free_all(&g_drug_head);
-    ward_free_all(&g_ward_head);
-    register_free_all(&g_register_head);
-    consultation_free_all(&g_consultation_head);
-    examination_free_all(&g_examination_head);
-    inpatient_free_all(&g_inpatient_head);
-    billing_free_all(&g_billing_head);
+#ifdef _WIN32
+    if (run_console && !GetConsoleWindow()) {
+        (void)AllocConsole();
+        (void)freopen("CONIN$", "r", stdin);
+        (void)freopen("CONOUT$", "w", stdout);
+        (void)freopen("CONOUT$", "w", stderr);
+    }
+#endif
 
-    return 0;
+    if (run_console) {
+        (void)his_console_init();
+    }
+
+    int init_ok = his_init("data");
+    if (!init_ok) {
+        if (run_console) {
+            printf("提示：初始化加载未完全成功（可能存在缺失文件），可继续运行。\n");
+        }
+#ifdef _WIN32
+        else {
+            MessageBoxA(NULL, "Init loading was not fully successful.\nSome data files may be missing.", "HIS", MB_OK | MB_ICONWARNING);
+        }
+#endif
+    }
+
+    int rc = 0;
+    if (run_console) {
+        rc = his_console_main();
+    } else {
+        rc = his_gui_main();
+    }
+
+    release_all_lists();
+    return rc;
 }

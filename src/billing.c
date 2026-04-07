@@ -22,6 +22,7 @@ Billing *g_billing_head = NULL;
  * 生成下一条计费流水ID（当前最大ID + 1）。
  */
 static int billing_next_id(Billing *head) {
+    //遍历链表找到最大ID，返回 max_id + 1
     int max_id = 0;
     for (Billing *cur = head; cur; cur = cur->next) {
         if (cur->id > max_id) max_id = cur->id;
@@ -33,24 +34,16 @@ static int billing_next_id(Billing *head) {
  * 计费类型枚举转字符串（用于展示与落盘）。
  */
 static const char* billing_type_to_string(BillingType t) {
+    //根据 BillingType 枚举值返回对应的字符串
     switch (t) {
-        case BILL_DEPOSIT: return "DEPOSIT";
-        case BILL_TOPUP:   return "TOPUP";
-        case BILL_CHARGE:  return "CHARGE";
-        case BILL_REFUND:  return "REFUND";
-        default:           return "UNKNOWN";
+        case BILL_DEPOSIT: return "DEPOSIT";// 入院押金(Deposit 存款)
+        case BILL_TOPUP:   return "TOPUP";// 补缴押金(Topop 增加)
+        case BILL_CHARGE:  return "CHARGE";// 费用扣除(Charge 扣费)
+        case BILL_REFUND:  return "REFUND";// 退费(Refund 退款)
+        default:           return "UNKNOWN";// 未知类型
     }
 }
 
-/**
- * 解析日期时间字符串。
- * @param s        输入字符串
- * @param y,m,d    输出年月日
- * @param hh,mm    输出时分（若无时间则默认 23:59）
- * @param has_time 输出：是否包含时间部分
- * @return 成功返回 1；失败返回 0
- * @note 支持：YYYY-MM-DD、YYYY-MM-DDTHH:MM、YYYY-MM-DD HH:MM
- */
 static int parse_datetime(const char *s, int *y, int *m, int *d, int *hh, int *mm, int *has_time) {
     if (!s || !y || !m || !d || !hh || !mm || !has_time) return 0;
 
@@ -59,11 +52,15 @@ static int parse_datetime(const char *s, int *y, int *m, int *d, int *hh, int *m
     *mm = 59;
     *has_time = 0;
 
-    // 支持：YYYY-MM-DD
+    // 支持：YYYY-MM-DD  注意：不严格校验日期合法性（如 2024-02-30 也能解析），但要求格式正确
     if (sscanf(s, "%d-%d-%d", y, m, d) != 3) return 0;
 
-    // 支持：YYYY-MM-DDTHH:MM 或 YYYY-MM-DD HH:MM
+    // 支持：YYYY-MM-DDTHH:MM 或 YYYY-MM-DD HH:MM  注意：不严格校验时间合法性（如 25:61 也能解析），但要求格式正确
+    //关于strchr的使用：先查找 'T'，如果找不到再查找 ' '，以支持两种常见的日期时间分隔符
+    //函数原型：char *strchr(const char *str, int c);
+
     const char *p = strchr(s, 'T');
+    
     if (!p) p = strchr(s, ' ');
     if (p) {
         int th = 0, tm = 0;

@@ -25,8 +25,15 @@
         "src/register.c",
         "src/report.c",
         "src/ward.c",
+        "src/gui.c",
         "-o",
-        "his.exe"
+        "his.exe",
+        "-mwindows",
+        "-luser32",
+        "-lgdi32",
+        "-lole32",
+        "-luuid",
+        "-lwindowscodecs"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

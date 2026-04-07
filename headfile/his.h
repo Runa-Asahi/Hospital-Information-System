@@ -155,6 +155,31 @@ extern Billing *g_billing_head;
  */
 int his_console_init(void);
 
+/* ==================== 程序入口（控制台/GUI） ==================== */
+/**
+ * 运行原有的控制台菜单循环。
+ * @return 进程返回码
+ */
+int his_console_main(void);
+
+/**
+ * 在“已初始化且已加载数据”的前提下，执行一次控制台菜单操作（1~9）。
+ * 该函数会在控制台中进行交互输入/输出。
+ * @return 成功返回 1；失败返回 0
+ */
+int his_console_run_operation(int op);
+
+/**
+ * 释放所有全局链表节点（退出时调用）。
+ */
+void his_release_all(void);
+
+/**
+ * 运行 Win32 图形化主界面（Windows 平台）。
+ * @return 进程返回码
+ */
+int his_gui_main(void);
+
 /* ==================== 文件读写/初始化 ==================== */
 /**
  * 加载/保存函数：把 data/ 目录下各类 .txt 文件映射到全局链表。
